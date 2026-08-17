@@ -1,9 +1,10 @@
 "use client";
 
+import { asset } from "./base";
 import type { SequenceMeta } from "./media.generated";
 
 export const framePath = (name: string, index: number) =>
-  `/frames/${name}/${String(index + 1).padStart(4, "0")}.jpg`;
+  asset(`/frames/${name}/${String(index + 1).padStart(4, "0")}.jpg`);
 
 type Entry = {
   images: HTMLImageElement[];

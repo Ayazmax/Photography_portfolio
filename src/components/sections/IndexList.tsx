@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRef } from "react";
 import { gsap } from "@/lib/gsap";
 import { useIsomorphicLayoutEffect } from "@/hooks/useIsomorphicLayoutEffect";
+import { asset } from "@/lib/base";
 import { stillBySlug } from "@/lib/media.generated";
 import { WORKS } from "@/lib/site";
 
@@ -155,7 +156,7 @@ export default function IndexList() {
               className="absolute inset-0 opacity-0"
             >
               <Image
-                src={`/img/${still.slug}.jpg`}
+                src={asset(`/img/${still.slug}.jpg`)}
                 alt=""
                 fill
                 sizes="30vw"

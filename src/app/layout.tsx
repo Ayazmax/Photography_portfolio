@@ -23,7 +23,7 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://odessavane.com"),
+  metadataBase: new URL("https://ayazmax.github.io/Photography_portfolio/"),
   title: {
     default: "Odessa Vane — Wedding & Party Photographer",
     template: "%s — Odessa Vane",
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     description:
       "Colour-forward wedding, party and environmental photography. Nothing beige.",
     type: "website",
-    images: ["/img/work-01.jpg"],
+    images: ["img/work-01.jpg"],
   },
 };
 

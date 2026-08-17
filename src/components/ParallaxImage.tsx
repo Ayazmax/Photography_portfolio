@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRef } from "react";
 import { gsap } from "@/lib/gsap";
 import { useIsomorphicLayoutEffect } from "@/hooks/useIsomorphicLayoutEffect";
+import { asset } from "@/lib/base";
 import { stillBySlug } from "@/lib/media.generated";
 
 type Props = {
@@ -68,7 +69,7 @@ export default function ParallaxImage({
         className="absolute inset-0 scale-[1.18] will-change-transform"
       >
         <Image
-          src={`/img/${still.slug}.jpg`}
+          src={asset(`/img/${still.slug}.jpg`)}
           alt={alt}
           fill
           sizes={sizes}

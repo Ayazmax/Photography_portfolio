@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRef } from "react";
 import { gsap } from "@/lib/gsap";
 import { useIsomorphicLayoutEffect } from "@/hooks/useIsomorphicLayoutEffect";
+import { asset } from "@/lib/base";
 import { stillBySlug } from "@/lib/media.generated";
 import { WORKS } from "@/lib/site";
 
@@ -143,7 +144,7 @@ export default function HorizontalGallery() {
                     className="absolute inset-0 scale-[1.16] [backface-visibility:hidden]"
                   >
                     <Image
-                      src={`/img/${still.slug}.jpg`}
+                      src={asset(`/img/${still.slug}.jpg`)}
                       alt={`${work.title} — ${work.place}, ${work.year}`}
                       fill
                       sizes="(max-width: 768px) 80vw, 40vw"

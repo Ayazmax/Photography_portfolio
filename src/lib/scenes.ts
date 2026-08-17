@@ -1,3 +1,4 @@
+import { asset } from "@/lib/base";
 import { SCENES } from "@/lib/layers.generated";
 import { SITE } from "@/lib/site";
 
@@ -56,7 +57,11 @@ const BEATS: readonly Beat[] = [
 
 export const HERO_SCENES = BEATS.map((beat) => {
   const layers = SCENES.find((scene) => scene.slug === beat.slug) ?? SCENES[0];
-  return { ...beat, cast: layers.cast, plate: layers.plate };
+  return {
+    ...beat,
+    cast: { ...layers.cast, src: asset(layers.cast.src) },
+    plate: { ...layers.plate, src: asset(layers.plate.src) },
+  };
 });
 
 /** Everything the opening composition needs on screen before we lift the curtain. */

@@ -5,22 +5,21 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Publish the static export to the `gh-pages` branch. GitHub Pages then serves
+# that branch — this does not use deploy-pages, which 404s until Pages exists.
 permissions:
-  contents: read
+  contents: write
   pages: write
-  id-token: write
 
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Enable GitHub Pages
-        uses: actions/configure-pages@v5
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -30,18 +29,24 @@ jobs:
         env:
           NEXT_PUBLIC_BASE_PATH: /Photography_portfolio
       - run: touch out/.nojekyll
-      - uses: actions/upload-pages-artifact@v3
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: out
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Enable GitHub Pages
-        uses: actions/configure-pages@v5
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./out
+          publish_branch: gh-pages
+          force_orphan: true
+      - name: Enable Pages from gh-pages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api --method POST /repos/${{ github.repository }}/pages \
+            --input - <<'EOF' || true
+          {
+            "build_type": "legacy",
+            "source": {
+              "branch": "gh-pages",
+              "path": "/"
+            }
+          }
+          EOF

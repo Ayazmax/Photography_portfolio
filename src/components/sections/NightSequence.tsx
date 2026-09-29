@@ -96,7 +96,7 @@ export default function NightSequence() {
                 className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center [text-shadow:0_2px_28px_rgba(23,18,14,0.75)]"
               >
                 <p
-                  className={`label inline-block rounded-full bg-ink/75 px-4 py-2 backdrop-blur-sm ${beat.accent}`}
+                  className={`label inline-block rounded-full bg-ink/75 px-4 py-2 backdrop-blur-sm touch:bg-ink/85 touch:backdrop-blur-none ${beat.accent}`}
                 >
                   {beat.lead}
                 </p>

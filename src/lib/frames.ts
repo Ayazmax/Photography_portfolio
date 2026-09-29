@@ -23,7 +23,25 @@ const registry = new Map<string, Entry>();
 /** Frames load in order through a small pool so early frames arrive first. */
 const POOL_SIZE = 8;
 
-function startLoading(entry: Entry, name: string) {
+/**
+ * Every decoded 720p frame is ~3.7 MB of bitmap. Phones get every other frame;
+ * `nearestDrawable` fills the gaps, and at phone sizes the skip is invisible.
+ */
+const frameStride = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia("(hover: none) and (pointer: coarse)").matches
+    ? 2
+    : 1;
+
+function frameIndices(frames: number) {
+  const stride = frameStride();
+  const out: number[] = [];
+  for (let i = 0; i < frames; i += stride) out.push(i);
+  if (out[out.length - 1] !== frames - 1) out.push(frames - 1);
+  return out;
+}
+
+function startLoading(entry: Entry, name: string, indices: number[]) {
   let next = 0;
 
   const loadOne = (index: number) =>
@@ -49,7 +67,7 @@ function startLoading(entry: Entry, name: string) {
     });
 
   const worker = async () => {
-    while (next < entry.total) await loadOne(next++);
+    while (next < indices.length) await loadOne(indices[next++]);
   };
 
   return Promise.all(Array.from({ length: POOL_SIZE }, worker)).then(
@@ -61,14 +79,15 @@ export function loadSequence(meta: SequenceMeta) {
   let entry = registry.get(meta.name);
 
   if (!entry) {
+    const indices = frameIndices(meta.frames);
     const created: Entry = {
       images: new Array<HTMLImageElement>(meta.frames),
       loaded: 0,
-      total: meta.frames,
+      total: indices.length,
       listeners: new Set(),
       ready: Promise.resolve([]),
     };
-    created.ready = startLoading(created, meta.name);
+    created.ready = startLoading(created, meta.name, indices);
     registry.set(meta.name, created);
     entry = created;
   }

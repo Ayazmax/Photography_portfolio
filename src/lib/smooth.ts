@@ -10,8 +10,15 @@ export const registerLenis = (lenis: Lenis | null) => {
 
 export const getLenis = () => instance;
 
-export const lockScroll = () => instance?.stop();
-export const unlockScroll = () => instance?.start();
+export const lockScroll = () => {
+  if (instance) instance.stop();
+  else document.documentElement.style.overflow = "hidden";
+};
+
+export const unlockScroll = () => {
+  if (instance) instance.start();
+  document.documentElement.style.overflow = "";
+};
 
 /** Smooth scroll to a document Y. Prefers Lenis when it owns the scroller. */
 export function scrollToY(

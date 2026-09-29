@@ -2,7 +2,12 @@
 
 import { useEffect } from "react";
 import Lenis from "lenis";
-import { gsap, ScrollTrigger, prefersReducedMotion } from "@/lib/gsap";
+import {
+  gsap,
+  ScrollTrigger,
+  isTouchDevice,
+  prefersReducedMotion,
+} from "@/lib/gsap";
 import { registerLenis } from "@/lib/smooth";
 import { onReady } from "@/lib/ready";
 
@@ -13,7 +18,9 @@ export default function SmoothScroll() {
     document.fonts.ready.then(() => ScrollTrigger.refresh());
     const stopReady = onReady(() => ScrollTrigger.refresh());
 
-    if (prefersReducedMotion()) return stopReady;
+    // Phones already have native momentum scrolling; layering Lenis on top only
+    // adds main-thread work and fights the finger.
+    if (prefersReducedMotion() || isTouchDevice()) return stopReady;
 
     const lenis = new Lenis({
       lerp: 0.085,

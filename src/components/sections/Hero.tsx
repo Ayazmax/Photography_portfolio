@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { gsap, prefersReducedMotion } from "@/lib/gsap";
+import { gsap, isTouchDevice, prefersReducedMotion } from "@/lib/gsap";
 import { useIsomorphicLayoutEffect } from "@/hooks/useIsomorphicLayoutEffect";
 import { onReady } from "@/lib/ready";
 import { HERO_SCENES } from "@/lib/scenes";
@@ -83,6 +83,9 @@ export default function Hero() {
 
     let snapTimer: ReturnType<typeof setTimeout> | null = null;
     let snapping = false;
+    // Programmatic scrolls during native touch momentum get cancelled or
+    // fought by the browser, which reads as the page sticking.
+    const canSnap = !isTouchDevice();
 
     const paintBeat = (i: number) => {
       beatRef.current = i;
@@ -165,7 +168,7 @@ export default function Hero() {
 
             // Auto-lock to the nearest composed beat once the scroll settles,
             // so a short flick mid-cross always lands on a perfect frame.
-            if (snapping || !self.isActive) return;
+            if (!canSnap || snapping || !self.isActive) return;
             if (snapTimer) clearTimeout(snapTimer);
             snapTimer = setTimeout(() => {
               if (!self.isActive || snapping) return;
@@ -360,7 +363,7 @@ export default function Hero() {
                 className="h-full w-full object-cover"
               />
               <div
-                className="absolute inset-0 mix-blend-soft-light opacity-80"
+                className="absolute inset-0 mix-blend-soft-light opacity-80 touch:hidden"
                 style={{
                   background: `radial-gradient(65% 55% at 50% 50%, ${scene.tint} 0%, transparent 72%)`,
                 }}
@@ -373,7 +376,7 @@ export default function Hero() {
               className="pointer-events-none absolute inset-0 flex items-start justify-center pt-[16vh] md:pt-[14vh]"
             >
               <p
-                className={`display max-w-[18ch] px-4 text-center leading-[0.8] text-paper [text-shadow:0_3px_0_rgba(23,18,14,0.2),0_16px_70px_rgba(23,18,14,0.75)] ${
+                className={`display max-w-[18ch] px-4 text-center leading-[0.8] text-paper [text-shadow:0_3px_0_rgba(23,18,14,0.2),0_16px_70px_rgba(23,18,14,0.75)] touch:[text-shadow:0_3px_18px_rgba(23,18,14,0.6)] ${
                   scene.wordmark
                     ? "text-[16vw] md:text-[10.5vw]"
                     : "text-[11vw] uppercase tracking-[-0.01em] md:text-[7.2vw]"
@@ -398,7 +401,7 @@ export default function Hero() {
               <div className="relative flex h-[54vh] items-end pb-[7vh] md:h-[68vh] md:pb-[6vh]">
                 {/* Contact shadow — pins the cutout to the plate. */}
                 <span
-                  className="absolute bottom-[2%] left-1/2 h-[8%] w-[72%] -translate-x-1/2 rounded-[50%] bg-ink/80 blur-3xl"
+                  className="absolute bottom-[2%] left-1/2 h-[8%] w-[72%] -translate-x-1/2 rounded-[50%] bg-ink/80 blur-3xl touch:hidden"
                   aria-hidden
                 />
                 <img
@@ -409,7 +412,7 @@ export default function Hero() {
                   draggable={false}
                   fetchPriority={i === 0 ? "high" : "low"}
                   decoding="async"
-                  className="relative h-full w-auto max-w-[92vw] object-contain drop-shadow-[0_28px_50px_rgba(23,18,14,0.55)]"
+                  className="relative h-full w-auto max-w-[92vw] object-contain drop-shadow-[0_28px_50px_rgba(23,18,14,0.55)] touch:drop-shadow-none"
                 />
               </div>
             </div>

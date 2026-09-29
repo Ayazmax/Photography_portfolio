@@ -7,7 +7,9 @@ const NOISE =
  */
 export default function GrainOverlay() {
   return (
-    <div className="pointer-events-none fixed inset-0 z-[80] overflow-hidden">
+    // A fixed, animated blend layer forces the whole page to recomposite every
+    // frame — phones can't afford that while scrolling.
+    <div className="pointer-events-none fixed inset-0 z-[80] overflow-hidden touch:hidden">
       <div
         className="absolute -inset-[50%] opacity-[0.07] mix-blend-overlay"
         style={{

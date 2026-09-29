@@ -1,7 +1,12 @@
 "use client";
 
 import { useRef, type ElementType, type ReactNode } from "react";
-import { gsap, SplitText, prefersReducedMotion } from "@/lib/gsap";
+import {
+  gsap,
+  SplitText,
+  isTouchDevice,
+  prefersReducedMotion,
+} from "@/lib/gsap";
 import { useIsomorphicLayoutEffect } from "@/hooks/useIsomorphicLayoutEffect";
 
 type Props = {
@@ -34,26 +39,42 @@ export default function ScrollText({
     document.fonts.ready.then(() => {
       if (disposed) return;
 
+      // Scrubbing opacity on every word repaints the whole paragraph on each
+      // scroll tick; phones get a single timed sweep when it comes into view.
+      const touch = isTouchDevice();
+
       const ctx = gsap.context(() => {
         SplitText.create(el, {
           type: "words",
           autoSplit: true,
           onSplit: (self) =>
-            gsap.fromTo(
-              self.words,
-              { opacity: dim },
-              {
-                opacity: 1,
-                ease: "none",
-                stagger: 0.4,
-                scrollTrigger: {
-                  trigger: el,
-                  start: "top 78%",
-                  end: "bottom 58%",
-                  scrub: 0.4,
-                },
-              }
-            ),
+            touch
+              ? gsap.fromTo(
+                  self.words,
+                  { opacity: dim },
+                  {
+                    opacity: 1,
+                    ease: "power1.out",
+                    duration: 0.5,
+                    stagger: 0.025,
+                    scrollTrigger: { trigger: el, start: "top 75%", once: true },
+                  }
+                )
+              : gsap.fromTo(
+                  self.words,
+                  { opacity: dim },
+                  {
+                    opacity: 1,
+                    ease: "none",
+                    stagger: 0.4,
+                    scrollTrigger: {
+                      trigger: el,
+                      start: "top 78%",
+                      end: "bottom 58%",
+                      scrub: 0.4,
+                    },
+                  }
+                ),
         });
       }, el);
 

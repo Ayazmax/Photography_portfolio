@@ -1,9 +1,15 @@
 "use client";
 
 import { useRef } from "react";
-import { gsap, ScrollTrigger } from "@/lib/gsap";
+import { gsap, ScrollTrigger, isTouchDevice } from "@/lib/gsap";
 import { useIsomorphicLayoutEffect } from "@/hooks/useIsomorphicLayoutEffect";
-import { loadSequence, nearestDrawable, onSequenceProgress } from "@/lib/frames";
+import {
+  frameSize,
+  loadSequence,
+  nearestDrawable,
+  onSequenceProgress,
+  type Frame,
+} from "@/lib/frames";
 import type { SequenceMeta } from "@/lib/media.generated";
 
 /**
@@ -29,6 +35,8 @@ type Props = {
 
 /** Upscaling a 1440px source past this just burns fill rate. */
 const MAX_DPR = 1.5;
+/** Phone crops are ~720px tall, so a 1× canvas already matches the source. */
+const MAX_DPR_TOUCH = 1;
 
 /**
  * Draws a numbered JPG sequence to a canvas, mapping scroll progress to a
@@ -56,36 +64,44 @@ export default function FrameSequence({
     const host = canvas?.closest<HTMLElement>(`[${SEQUENCE_HOST}]`);
     if (!canvas || !host) return;
 
+    const touch = isTouchDevice();
     const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) return;
+    const quality: ImageSmoothingQuality = touch ? "low" : "high";
     ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
+    ctx.imageSmoothingQuality = quality;
 
-    let images: HTMLImageElement[] | null = null;
+    let images: Frame[] | null = null;
+    let drawn: Frame | null = null;
     const playhead = { frame: 0 };
 
-    const draw = () => {
+    // `force` repaints after a resize wipes the canvas; otherwise skip scrub
+    // ticks that land on the frame already showing.
+    const draw = (force = false) => {
       if (!images) return;
       const img = nearestDrawable(images, Math.round(playhead.frame));
-      if (!img) return;
+      if (!img || (!force && img === drawn)) return;
+      drawn = img;
 
+      const { width: iw, height: ih } = frameSize(img);
       const { width: cw, height: ch } = canvas;
-      const scale = Math.max(cw / img.naturalWidth, ch / img.naturalHeight);
-      const w = img.naturalWidth * scale;
-      const h = img.naturalHeight * scale;
+      const scale = Math.max(cw / iw, ch / ih);
+      const w = iw * scale;
+      const h = ih * scale;
       ctx.drawImage(img, (cw - w) / 2, (ch - h) / 2, w, h);
     };
 
     const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+      const cap = touch ? MAX_DPR_TOUCH : MAX_DPR;
+      const dpr = Math.min(window.devicePixelRatio || 1, cap);
       const rect = canvas.getBoundingClientRect();
       const w = Math.max(1, Math.round(rect.width * dpr));
       const h = Math.max(1, Math.round(rect.height * dpr));
       if (canvas.width === w && canvas.height === h) return;
       canvas.width = w;
       canvas.height = h;
-      ctx.imageSmoothingQuality = "high";
-      draw();
+      ctx.imageSmoothingQuality = quality;
+      draw(true);
     };
 
     let unsubscribe: (() => void) | undefined;
@@ -94,7 +110,7 @@ export default function FrameSequence({
       if (images) return;
       images = loadSequence(sequence).images;
       // Repaint as frames stream in so the first view isn't blank.
-      unsubscribe = onSequenceProgress(sequence, draw);
+      unsubscribe = onSequenceProgress(sequence, () => draw());
     };
 
     const ctxScope = gsap.context(() => {
@@ -116,7 +132,7 @@ export default function FrameSequence({
           trigger: host,
           start,
           end,
-          scrub: 0.45,
+          scrub: touch ? true : 0.45,
           invalidateOnRefresh: true,
         },
         onUpdate: () => {

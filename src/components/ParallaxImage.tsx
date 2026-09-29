@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRef } from "react";
-import { gsap } from "@/lib/gsap";
+import { gsap, isTouchDevice } from "@/lib/gsap";
 import { useIsomorphicLayoutEffect } from "@/hooks/useIsomorphicLayoutEffect";
 import { asset } from "@/lib/base";
 import { stillBySlug } from "@/lib/media.generated";
@@ -33,7 +33,7 @@ export default function ParallaxImage({
 
   useIsomorphicLayoutEffect(() => {
     const wrap = wrapRef.current;
-    if (!wrap) return;
+    if (!wrap || isTouchDevice()) return;
 
     const ctx = gsap.context(() => {
       const target = wrap.querySelector("[data-parallax-inner]");
@@ -66,7 +66,7 @@ export default function ParallaxImage({
     <div ref={wrapRef} className={`relative overflow-hidden ${className}`}>
       <div
         data-parallax-inner
-        className="absolute inset-0 scale-[1.18] will-change-transform"
+        className="absolute inset-0 scale-[1.18] will-change-transform touch:scale-100 touch:will-change-auto"
       >
         <Image
           src={asset(`/img/${still.slug}.jpg`)}

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRef } from "react";
-import { gsap } from "@/lib/gsap";
+import { gsap, isTouchDevice } from "@/lib/gsap";
 import { useIsomorphicLayoutEffect } from "@/hooks/useIsomorphicLayoutEffect";
 import { asset } from "@/lib/base";
 import { stillBySlug } from "@/lib/media.generated";
@@ -51,8 +51,12 @@ export default function HorizontalGallery() {
         },
       });
 
-      // Drift each frame against the track for depth.
-      gsap.utils.toArray<HTMLElement>("[data-card-media]").forEach((media) => {
+      // Drift each frame against the track for depth. Skipped on phones: seven
+      // extra scrubbed layers per scroll tick is more than the track is worth.
+      const drift = isTouchDevice()
+        ? []
+        : gsap.utils.toArray<HTMLElement>("[data-card-media]");
+      drift.forEach((media) => {
         const inner = media.querySelector("[data-card-inner]");
         if (!inner) return;
 
@@ -141,7 +145,7 @@ export default function HorizontalGallery() {
                 >
                   <div
                     data-card-inner
-                    className="absolute inset-0 scale-[1.16] [backface-visibility:hidden]"
+                    className="absolute inset-0 scale-[1.16] [backface-visibility:hidden] touch:scale-100"
                   >
                     <Image
                       src={asset(`/img/${still.slug}.jpg`)}
@@ -150,7 +154,7 @@ export default function HorizontalGallery() {
                       sizes="(max-width: 768px) 80vw, 40vw"
                       placeholder="blur"
                       blurDataURL={still.blurDataURL}
-                      className="object-cover transition-[filter,transform] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:saturate-[1.25]"
+                      className="object-cover transition-[filter,transform] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:saturate-[1.25] touch:transition-none"
                     />
                   </div>
                 </div>

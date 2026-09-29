@@ -1,7 +1,12 @@
 "use client";
 
 import { useRef, type ReactNode } from "react";
-import { gsap, ScrollTrigger, prefersReducedMotion } from "@/lib/gsap";
+import {
+  gsap,
+  ScrollTrigger,
+  isTouchDevice,
+  prefersReducedMotion,
+} from "@/lib/gsap";
 import { useIsomorphicLayoutEffect } from "@/hooks/useIsomorphicLayoutEffect";
 
 type Props = {
@@ -38,12 +43,27 @@ export default function Marquee({
         duration,
         ease: "none",
       });
-      loop.timeScale(base);
+      loop.timeScale(base).pause();
+
+      // Only tick while on screen.
+      ScrollTrigger.create({
+        trigger: track,
+        start: "top bottom",
+        end: "bottom top",
+        onToggle: (self) => (self.isActive ? loop.play() : loop.pause()),
+      });
+
+      // Velocity coupling spawns a tween per scroll event — fine for a wheel,
+      // wasteful for touch momentum.
+      if (isTouchDevice()) return;
 
       let direction = base;
       let settle = 0;
 
       ScrollTrigger.create({
+        trigger: track,
+        start: "top bottom",
+        end: "bottom top",
         onUpdate: (self) => {
           const velocity = self.getVelocity();
           direction = (velocity > 0 ? 1 : -1) * base;

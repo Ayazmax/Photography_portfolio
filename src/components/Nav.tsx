@@ -62,7 +62,9 @@ export default function Nav() {
   return (
     <header
       ref={ref}
-      className="fixed inset-x-0 top-0 z-[70] mix-blend-difference"
+      // A fixed blend layer makes phones recomposite everything beneath it on
+      // every scroll frame, so touch gets a plain scrim instead.
+      className="fixed inset-x-0 top-0 z-[70] mix-blend-difference touch:bg-gradient-to-b touch:from-ink/70 touch:to-transparent touch:mix-blend-normal"
     >
       <nav className="flex items-center justify-between gap-6 px-6 py-6 md:px-12">
         <button

@@ -51,6 +51,21 @@ const SNAP_EPS = 0.012;
  * Layers keep full opacity while travelling — we only fade at the very edges —
  * so the cross reads as solid PNGs rotating through the stage, not a double-exposure.
  */
+/**
+ * Phones get a flat cross: depth, tilt and scale tweens make the GPU re-raster
+ * the oversized plates every frame, which is what stalls touch scrolling. Pure
+ * translate + alpha stays on the compositor.
+ */
+const FLAT_DEPTH = { plate: 0, title: 0, cast: 0 } as const;
+const FLAT_REST = { plate: 1, title: 1, cast: 1 } as const;
+
+const flatAway = (side: number) => ({
+  // The plate is 180% wide on touch, so 22% ≈ 40vw — never past its bleed.
+  plate: { xPercent: 22 * side },
+  title: { xPercent: 100 * side },
+  cast: { xPercent: -95 * side },
+});
+
 const away = (side: number) => ({
   plate: {
     xPercent: 58 * side,
@@ -85,7 +100,11 @@ export default function Hero() {
     let snapping = false;
     // Programmatic scrolls during native touch momentum get cancelled or
     // fought by the browser, which reads as the page sticking.
-    const canSnap = !isTouchDevice();
+    const lite = isTouchDevice();
+    const canSnap = !lite;
+    const depth = lite ? FLAT_DEPTH : DEPTH;
+    const rest = lite ? FLAT_REST : REST;
+    const pose = lite ? flatAway : away;
 
     const paintBeat = (i: number) => {
       beatRef.current = i;
@@ -115,20 +134,20 @@ export default function Hero() {
       // alpha move after this, so GSAP keeps one matrix per layer.
       parts.forEach(({ plate, title, cast }) => {
         gsap.set(plate, {
-          z: DEPTH.plate,
-          scale: REST.plate,
+          z: depth.plate,
+          scale: rest.plate,
           transformOrigin: "50% 50%",
           force3D: true,
         });
         gsap.set(title, {
-          z: DEPTH.title,
-          scale: REST.title,
+          z: depth.title,
+          scale: rest.title,
           transformOrigin: "50% 50%",
           force3D: true,
         });
         gsap.set(cast, {
-          z: DEPTH.cast,
-          scale: REST.cast,
+          z: depth.cast,
+          scale: rest.cast,
           transformOrigin: "50% 88%",
           force3D: true,
         });
@@ -217,8 +236,8 @@ export default function Hero() {
         // the stage, not the same slide four times.
         const dir = i % 2 === 0 ? 1 : -1;
         const c = centre(i);
-        const from = away(-dir);
-        const to = away(dir);
+        const from = pose(-dir);
+        const to = pose(dir);
 
         const enterAt = c - HOLD - TRAVEL;
         if (enterAt >= 0) {
@@ -233,7 +252,7 @@ export default function Hero() {
             {
               xPercent: 0,
               rotateY: 0,
-              scale: REST.cast,
+              scale: rest.cast,
               autoAlpha: 1,
               duration: TRAVEL,
               ease,
@@ -246,7 +265,7 @@ export default function Hero() {
               {
                 xPercent: 0,
                 rotateY: 0,
-                scale: REST.plate,
+                scale: rest.plate,
                 autoAlpha: 1,
                 duration: TRAVEL,
                 ease,
@@ -259,19 +278,22 @@ export default function Hero() {
               {
                 xPercent: 0,
                 rotateY: 0,
-                scale: REST.title,
+                scale: rest.title,
                 autoAlpha: 1,
                 duration: TRAVEL * 0.95,
                 ease,
               },
               enterAt + titleLag
-            )
-            .fromTo(
+            );
+
+          if (!lite) {
+            tl.fromTo(
               cast,
               { scale: REST.cast * 0.96 },
               { scale: REST.cast, duration: TRAVEL * 0.35, ease: "back.out(1.6)" },
               c - HOLD
             );
+          }
         }
 
         const exitAt = c + HOLD;
@@ -303,11 +325,25 @@ export default function Hero() {
             .timeline({ defaults: { ease: "expo.out", duration: 1.55 } })
             .from(
               plate,
-              { xPercent: -28, scale: REST.plate * 1.14, rotateY: 11 },
+              lite
+                ? { xPercent: -28 }
+                : { xPercent: -28, scale: REST.plate * 1.14, rotateY: 11 },
               0
             )
-            .from(cast, { xPercent: 48, autoAlpha: 0, rotateY: -14 }, 0.05)
-            .from(title, { xPercent: -52, autoAlpha: 0, rotateY: 14 }, 0.14)
+            .from(
+              cast,
+              lite
+                ? { xPercent: 48, autoAlpha: 0 }
+                : { xPercent: 48, autoAlpha: 0, rotateY: -14 },
+              0.05
+            )
+            .from(
+              title,
+              lite
+                ? { xPercent: -52, autoAlpha: 0 }
+                : { xPercent: -52, autoAlpha: 0, rotateY: 14 },
+              0.14
+            )
             .from(
               "[data-chrome]",
               { autoAlpha: 0, y: 12, duration: 0.9, stagger: 0.08 },
@@ -333,7 +369,7 @@ export default function Hero() {
       style={{ height: `${COUNT * 110 + 30}vh` }}
       aria-label="Introduction"
     >
-      <div className="sticky top-0 h-svh overflow-hidden [perspective:1200px] [perspective-origin:50%_48%]">
+      <div className="sticky top-0 h-svh overflow-hidden [perspective:1200px] [perspective-origin:50%_48%] touch:[perspective:none]">
         {/* Soft side vignettes — reads like looking through a lens. */}
         <div
           className="pointer-events-none absolute inset-0 z-30"
@@ -348,10 +384,10 @@ export default function Hero() {
           <div
             key={scene.slug}
             data-scene
-            className="absolute inset-0 [transform-style:preserve-3d]"
+            className="absolute inset-0 [transform-style:preserve-3d] touch:[transform-style:flat]"
             style={{ zIndex: i + 1 }}
           >
-            <div data-plate className="absolute inset-[-14%]">
+            <div data-plate className="absolute inset-[-14%] touch:inset-y-0 touch:-inset-x-[40%]">
               <img
                 src={scene.plate.src}
                 width={scene.plate.width}
@@ -373,7 +409,7 @@ export default function Hero() {
 
             <div
               data-title
-              className="pointer-events-none absolute inset-0 flex items-start justify-center pt-[16vh] md:pt-[14vh]"
+              className="pointer-events-none absolute inset-0 flex items-start justify-center pt-[25vh] md:pt-[14vh]"
             >
               <p
                 className={`display max-w-[18ch] px-4 text-center leading-[0.8] text-paper [text-shadow:0_3px_0_rgba(23,18,14,0.2),0_16px_70px_rgba(23,18,14,0.75)] touch:[text-shadow:0_3px_18px_rgba(23,18,14,0.6)] ${
@@ -449,7 +485,7 @@ export default function Hero() {
                   {String(COUNT).padStart(2, "0")}
                 </span>
               </p>
-              <p className="mt-2 text-paper/50">ƒ/1.4 · 1/200 · ISO 1600</p>
+              <p className="mt-2 hidden text-paper/50 sm:block">ƒ/1.4 · 1/200 · ISO 1600</p>
             </div>
           </div>
 

@@ -6,11 +6,18 @@ import type { SequenceMeta } from "./media.generated";
 export const framePath = (name: string, index: number) =>
   asset(`/frames/${name}/${String(index + 1).padStart(4, "0")}.jpg`);
 
+/**
+ * Desktop keeps plain <img> elements. Phones get ImageBitmaps: they are decoded
+ * once up front, so drawImage never has to re-decode a JPEG mid-scroll (mobile
+ * browsers evict decoded <img> data aggressively).
+ */
+export type Frame = HTMLImageElement | ImageBitmap;
+
 type Entry = {
-  images: HTMLImageElement[];
+  images: Frame[];
   loaded: number;
   total: number;
-  ready: Promise<HTMLImageElement[]>;
+  ready: Promise<Frame[]>;
   listeners: Set<(progress: number) => void>;
 };
 
@@ -20,35 +27,47 @@ type Entry = {
  */
 const registry = new Map<string, Entry>();
 
-/** Frames load in order through a small pool so early frames arrive first. */
-const POOL_SIZE = 8;
+const isTouch = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 
 /**
  * Every decoded 720p frame is ~3.7 MB of bitmap. Phones get every other frame;
  * `nearestDrawable` fills the gaps, and at phone sizes the skip is invisible.
  */
-const frameStride = () =>
-  typeof window !== "undefined" &&
-  window.matchMedia("(hover: none) and (pointer: coarse)").matches
-    ? 2
-    : 1;
-
-function frameIndices(frames: number) {
-  const stride = frameStride();
+function frameIndices(frames: number, stride: number) {
   const out: number[] = [];
   for (let i = 0; i < frames; i += stride) out.push(i);
   if (out[out.length - 1] !== frames - 1) out.push(frames - 1);
   return out;
 }
 
-function startLoading(entry: Entry, name: string, indices: number[]) {
+/**
+ * A landscape frame covering a portrait screen only ever shows a centre
+ * strip, so phones keep just that (plus slack for the URL bar) — roughly a
+ * quarter of the pixels to decode, hold and draw.
+ */
+function cropFor(img: HTMLImageElement) {
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  const view = window.innerWidth / Math.max(1, window.innerHeight);
+  const sw = view < w / h ? Math.min(w, Math.round(h * view * 1.2)) : w;
+  return { sx: Math.round((w - sw) / 2), sw, h };
+}
+
+function startLoading(
+  entry: Entry,
+  name: string,
+  indices: number[],
+  bitmaps: boolean
+) {
   let next = 0;
 
   const loadOne = (index: number) =>
     new Promise<void>((resolve) => {
       const img = new Image();
       img.decoding = "async";
-      entry.images[index] = img;
+      if (!bitmaps) entry.images[index] = img;
 
       const settle = () => {
         entry.loaded += 1;
@@ -58,6 +77,19 @@ function startLoading(entry: Entry, name: string, indices: number[]) {
       };
 
       img.onload = () => {
+        if (bitmaps && typeof createImageBitmap === "function") {
+          const { sx, sw, h } = cropFor(img);
+          createImageBitmap(img, sx, 0, sw, h)
+            .then((bmp) => {
+              entry.images[index] = bmp;
+            })
+            .catch(() => {
+              entry.images[index] = img;
+            })
+            .finally(settle);
+          return;
+        }
+        if (bitmaps) entry.images[index] = img;
         // Decode off the main thread so the first paint doesn't stutter.
         if (typeof img.decode === "function") img.decode().then(settle, settle);
         else settle();
@@ -70,7 +102,8 @@ function startLoading(entry: Entry, name: string, indices: number[]) {
     while (next < indices.length) await loadOne(indices[next++]);
   };
 
-  return Promise.all(Array.from({ length: POOL_SIZE }, worker)).then(
+  const pool = bitmaps ? 4 : 8;
+  return Promise.all(Array.from({ length: pool }, worker)).then(
     () => entry.images
   );
 }
@@ -79,15 +112,16 @@ export function loadSequence(meta: SequenceMeta) {
   let entry = registry.get(meta.name);
 
   if (!entry) {
-    const indices = frameIndices(meta.frames);
+    const touch = isTouch();
+    const indices = frameIndices(meta.frames, touch ? 2 : 1);
     const created: Entry = {
-      images: new Array<HTMLImageElement>(meta.frames),
+      images: new Array<Frame>(meta.frames),
       loaded: 0,
       total: indices.length,
       listeners: new Set(),
       ready: Promise.resolve([]),
     };
-    created.ready = startLoading(created, meta.name, indices);
+    created.ready = startLoading(created, meta.name, indices, touch);
     registry.set(meta.name, created);
     entry = created;
   }
@@ -112,14 +146,20 @@ export function onSequenceProgress(
   };
 }
 
-const isDrawable = (img: HTMLImageElement | undefined): img is HTMLImageElement =>
-  !!img && img.complete && img.naturalWidth > 0;
+export const frameSize = (f: Frame) =>
+  f instanceof HTMLImageElement
+    ? { width: f.naturalWidth, height: f.naturalHeight }
+    : { width: f.width, height: f.height };
+
+const isDrawable = (f: Frame | undefined): f is Frame =>
+  !!f &&
+  (f instanceof HTMLImageElement ? f.complete && f.naturalWidth > 0 : f.width > 0);
 
 /**
  * Scrubbing can outrun the network, so fall back to the closest frame that has
  * actually decoded rather than flashing an empty canvas.
  */
-export function nearestDrawable(images: HTMLImageElement[], index: number) {
+export function nearestDrawable(images: Frame[], index: number) {
   if (isDrawable(images[index])) return images[index];
 
   for (let offset = 1; offset < images.length; offset += 1) {
